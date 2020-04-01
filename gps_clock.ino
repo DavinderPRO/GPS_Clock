@@ -23,6 +23,7 @@ void setup()
   ss.begin(9600);
   tm1637.init();
   tm1637.set(BRIGHT_TYPICAL);
+  Print_LED(0, 0);
 }
 
 void loop()
@@ -38,6 +39,7 @@ static void smartdelay(unsigned long ms)
   {
     while (ss.available())
       gps.encode(ss.read());
+
   } while (millis() - start < ms);
 }
 
@@ -52,10 +54,10 @@ static void get_date(TinyGPS &gps)
 
   if (age == TinyGPS::GPS_INVALID_AGE || age > 20000)
   {
-    Serial.print("********** ******** ");
+    Serial.print("Time: 88:88 ");
     Print_LED(88, 88);
   }
-  else if (age < 10000)
+  else if (age < 20000)
   {
     hour += 5;
     minute += 30;
@@ -72,8 +74,6 @@ static void get_date(TinyGPS &gps)
     char sz[32];
     sprintf(sz, "Time: %02d:%02d ", hour, minute);
     Serial.print(sz);
-
-    Print_LED(88, 88);
     Print_LED(hour, minute);
   }
 
