@@ -15,11 +15,11 @@ static void smartdelay(unsigned long ms);
 static void get_date(TinyGPS &gps);
 static void Print_LED(uint8_t hour, uint8_t minute);
 static boolean Pointonff = true;
-static void print_int(unsigned long val, unsigned long invalid, int len);
+// static void print_int(unsigned long val, unsigned long invalid, int len);
 
 void setup()
 {
-  Serial.begin(9600);
+  /// Serial.begin(9600);
   ss.begin(9600);
   tm1637.init();
   tm1637.set(BRIGHT_TYPICAL);
@@ -29,7 +29,7 @@ void setup()
 void loop()
 {
   get_date(gps);
-  smartdelay(1000);
+  smartdelay(2000);
 }
 
 static void smartdelay(unsigned long ms)
@@ -50,11 +50,11 @@ static void get_date(TinyGPS &gps)
   unsigned long age;
   gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths, &age);
 
-  print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
+  //  print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
 
   if (age == TinyGPS::GPS_INVALID_AGE || age > 20000)
   {
-    Serial.print("Time: 88:88 ");
+    //  Serial.print("Time: 88:88 ");
     Print_LED(88, 88);
   }
   else if (age < 20000)
@@ -73,12 +73,11 @@ static void get_date(TinyGPS &gps)
 
     char sz[32];
     sprintf(sz, "Time: %02d:%02d ", hour, minute);
-    Serial.print(sz);
+    //  Serial.print(sz);
     Print_LED(hour, minute);
   }
 
-  Serial.println();
-  smartdelay(0);
+  //  Serial.println();
 }
 
 static void Print_LED(uint8_t hour, uint8_t minute)
@@ -113,7 +112,7 @@ static void Print_LED(uint8_t hour, uint8_t minute)
   Pointonff != Pointonff;
   tm1637.point(Pointonff);
 }
-
+/*
 static void print_int(unsigned long val, unsigned long invalid, int len)
 {
   char sz[32];
@@ -131,3 +130,5 @@ static void print_int(unsigned long val, unsigned long invalid, int len)
   Serial.print(sz);
   smartdelay(0);
 }
+
+*/
