@@ -1,134 +1,133 @@
-
-#include <TM1637.h>
+#include <TinyGPS++.h>
 #include <SoftwareSerial.h>
-#include <TinyGPS.h>
-#define SRX 4
-#define STX 3
+#include <TM1637Display.h>
+
+// === Pin Configuration ===
+#define GPS_RX 4
+#define GPS_TX 3
 #define CLK 5
 #define DIO 6
 
-TM1637 tm1637(CLK, DIO);
-SoftwareSerial ss(SRX, STX);
-TinyGPS gps;
+// === Debug Print Toggle ===
+#define ENABLE_DEBUG 0
+#if ENABLE_DEBUG
+  #define DBG_PRINT(x) Serial.print(x)
+  #define DBG_PRINTLN(x) Serial.println(x)
+#else
+  #define DBG_PRINT(x)
+  #define DBG_PRINTLN(x)
+#endif
 
-static void smartdelay(unsigned long ms);
-static void get_date(TinyGPS &gps);
-static void Print_LED(uint8_t hour, uint8_t minute);
-static boolean Pointonff = true;
-// static void print_int(unsigned long val, unsigned long invalid, int len);
+TinyGPSPlus gps;
+SoftwareSerial ss(GPS_RX, GPS_TX);
+TM1637Display display(CLK, DIO);
 
-void setup()
-{
-  /// Serial.begin(9600);
+// === Timing Variables ===
+unsigned long lastTimeUpdate = 0;
+unsigned long lastColonBlink = 0;
+unsigned long lastDateDisplay = 0;
+unsigned long lastStatusPrint = 0;
+
+bool colonState = true;
+bool timeTrusted = false;
+bool showDateNow = false;
+
+void setup() {
+  #if ENABLE_DEBUG
+    Serial.begin(9600);
+  #endif
   ss.begin(9600);
-  tm1637.init();
-  tm1637.set(BRIGHT_TYPICAL);
-  Print_LED(0, 0);
+  display.setBrightness(0x0f);
+  display.showNumberDec(8888); // Startup animation
+  delay(1000);
 }
 
-void loop()
-{
-  get_date(gps);
-  smartdelay(2000);
-}
-
-static void smartdelay(unsigned long ms)
-{
-  unsigned long start = millis();
-  do
-  {
-    while (ss.available())
-      gps.encode(ss.read());
-
-  } while (millis() - start < ms);
-}
-
-static void get_date(TinyGPS &gps)
-{
-  int year;
-  uint8_t month, day, hour, minute, second, hundredths;
-  unsigned long age;
-  gps.crack_datetime(&year, &month, &day, &hour, &minute, &second, &hundredths, &age);
-
-  //  print_int(age, TinyGPS::GPS_INVALID_AGE, 5);
-
-  if (age == TinyGPS::GPS_INVALID_AGE || age > 20000)
-  {
-    //  Serial.print("Time: 88:88 ");
-    Print_LED(88, 88);
+void loop() {
+  while (ss.available()) {
+    gps.encode(ss.read());
   }
-  else if (age < 20000)
-  {
-    hour += 5;
-    minute += 30;
-    if (minute > 59)
-    {
-      minute -= 60;
-      hour += 1;
-    }
-    if (hour > 23)
-    {
-      hour -= 24;
+
+  unsigned long now = millis();
+
+  // Wait for GPS fix and reliable time
+  if (!timeTrusted) {
+    if (gps.time.isValid() && gps.satellites.value() > 3 && gps.time.age() < 2000) {
+      timeTrusted = true;
+      DBG_PRINTLN("GPS time is now trusted.");
     }
 
-    char sz[32];
-    sprintf(sz, "Time: %02d:%02d ", hour, minute);
-    //  Serial.print(sz);
-    Print_LED(hour, minute);
+    // Print GPS status every 2 seconds while waiting
+    if (now - lastStatusPrint >= 2000) {
+      DBG_PRINT("Satellites: ");
+      DBG_PRINT(gps.satellites.value());
+      DBG_PRINT(" | Time age: ");
+      DBG_PRINT(gps.time.age());
+      DBG_PRINTLN(" ms");
+      lastStatusPrint = now;
+    }
+
+    // Show waiting animation
+    display.showNumberDec(8888);
+    return;
   }
 
-  //  Serial.println();
+  // === Blink colon every 5 seconds ===
+  if (now - lastColonBlink >= 5000) {
+    colonState = !colonState;
+    lastColonBlink = now;
+  }
+
+  // === Show date every 2 minutes ===
+  if (now - lastDateDisplay >= 120000) {
+    showDateNow = true;
+    lastDateDisplay = now;
+  }
+
+  // === Update time every second ===
+  if (now - lastTimeUpdate >= 1000) {
+    lastTimeUpdate = now;
+
+    if (showDateNow) {
+      displayDate();
+      showDateNow = false;
+    } else {
+      displayTime();
+    }
+  }
 }
 
-static void Print_LED(uint8_t hour, uint8_t minute)
-{
+void displayTime() {
+  int hour = gps.time.hour();
+  int minute = gps.time.minute();
 
-  uint8_t u8arry[4] = {8, 8, 8, 8};
-  if (hour < 10)
-  {
-    u8arry[0] = 0;
-    u8arry[1] = hour;
+  // Timezone offset (IST +5:30)
+  hour += 5;
+  minute += 30;
+  if (minute >= 60) {
+    minute -= 60;
+    hour++;
   }
-  else
-  {
-    u8arry[0] = hour / 10;
-    u8arry[1] = hour % 10;
+  if (hour >= 24) {
+    hour -= 24;
   }
 
-  if (minute < 10)
-  {
-    u8arry[2] = 0;
-    u8arry[3] = minute;
-  }
-  else
-  {
-    u8arry[2] = minute / 10;
-    u8arry[3] = minute % 10;
-  }
-  tm1637.display(0, u8arry[0]);
-  tm1637.display(1, u8arry[1]);
-  tm1637.display(2, u8arry[2]);
-  tm1637.display(3, u8arry[3]);
-  Pointonff != Pointonff;
-  tm1637.point(Pointonff);
-}
-/*
-static void print_int(unsigned long val, unsigned long invalid, int len)
-{
-  char sz[32];
-  if (val == invalid)
-    strcpy(sz, "*******");
-  else
-    sprintf(sz, "  Age:  %ld", val);
+  uint8_t colonFlag = colonState ? 0b01000000 : 0x00;
+  display.showNumberDecEx(hour * 100 + minute, colonFlag, true);
 
-  sz[len] = 0;
-  for (int i = strlen(sz); i < len; ++i)
-    sz[i] = ' ';
-  if (len > 0)
-    sz[len - 1] = ' ';
-
-  Serial.print(sz);
-  smartdelay(0);
+  DBG_PRINT("Time: ");
+  DBG_PRINT(hour);
+  DBG_PRINT(":");
+  DBG_PRINTLN(minute);
 }
 
-*/
+void displayDate() {
+  int day = gps.date.day();
+  int month = gps.date.month();
+
+  display.showNumberDecEx(day * 100 + month, 0b01000000, true); // Show DD-MM
+  DBG_PRINT("Date: ");
+  DBG_PRINT(day);
+  DBG_PRINT("-");
+  DBG_PRINTLN(month);
+  delay(3000);
+}
